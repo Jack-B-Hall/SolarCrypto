@@ -152,6 +152,7 @@ journalctl -u solarCrypto.service -f
 - **Not connecting to Powerwall?** Make sure your IP address and password are correct.
 - **Mining not starting?** Check the `.env` file to ensure thresholds or overwrite settings are configured properly.
 - **Service not running?** Check logs with `journalctl -u solarCrypto.service -f` to debug.
+- **Not sure if Miner is using GPU?** Check with nvidia-smi `watch -n 1 nvidia-smi`.
 
 ---
 
