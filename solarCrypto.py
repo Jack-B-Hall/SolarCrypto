@@ -121,20 +121,37 @@ async def main():
                         miner_start_time = None
             else:
                 # 7) Normal threshold logic
-                meters = await powerwall.get_meters()
+                try:
+                    meters = await powerwall.get_meters()
+                except ApiError as err:
+                    if "Access denied" in str(err):
+                        log_info(f"Access denied error encountered: {err}. Attempting re-login...")
+                        try:
+                            await powerwall.login(powerwall_password, powerwall_email)
+                            if powerwall.is_authenticated():
+                                log_info("Re-login successful.")
+                            else:
+                                log_info("Re-login failed: not authenticated.")
+                        except ApiError as e:
+                            log_info("Re-login attempt failed: " + str(e))
+                        await asyncio.sleep(poll_interval)
+                        continue
+                    else:
+                        log_info(f"Error reading Powerwall or controlling miner: {err}")
+                        await asyncio.sleep(poll_interval)
+                        continue
+
                 site_power = meters.site.instant_power
 
-                # If negative means exporting, you might do:
-                # site_power = -site_power
-
-                if site_power >= export_start:
-                    # Start miner if not running
+                # For exporting, site_power is negative.
+                # If site_power is less than or equal to export_start (e.g., -1319 <= -1000), we have high export and should start the miner.
+                if site_power <= export_start:
                     if not miner_process or miner_process.poll() is not None:
                         log_info("Threshold: Starting miner.")
                         miner_process = subprocess.Popen(miner_cmd)
                         miner_start_time = time.time()
-                elif site_power <= export_stop:
-                    # Stop miner if running
+                # If site_power is greater than or equal to export_stop (e.g., -400 >= -500), export has dropped and we should stop the miner.
+                elif site_power >= export_stop:
                     if miner_process and miner_process.poll() is None:
                         run_time = time.time() - miner_start_time if miner_start_time else 0
                         total_miner_seconds += run_time
